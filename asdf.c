@@ -27,7 +27,6 @@
 
 typedef struct {
     char *text;
-    size_t length;
     size_t capacity;
 } Buffer;
 
@@ -40,7 +39,7 @@ typedef struct {
 void buffer_free(Buffer *buffer)
 {
     if (buffer->text) free(buffer->text);
-    buffer->length = buffer->capacity = 0;
+    buffer->capacity = 0;
 }
 
 // Read a file into a buffer
@@ -59,14 +58,14 @@ void buffer_read(Buffer *buffer, const char *file_name)
     size_t file_size = ftell(file);
     rewind(file);
 
-    buffer->length = file_size + 1;
+    size_t length = file_size + 1;
 
     // Buffer allocations if necessary
-    if (buffer->length > buffer->capacity) {
+    if (length > buffer->capacity) {
         buffer->text = (buffer->text)
-            ? realloc(buffer->text, buffer->length)
-            : malloc(buffer->length);
-        buffer->capacity = buffer->length;
+            ? realloc(buffer->text, length)
+            : malloc(length);
+        buffer->capacity = length;
     }
 
     // Read the file into the buffer
@@ -74,7 +73,6 @@ void buffer_read(Buffer *buffer, const char *file_name)
     fclose(file);
 
     buffer->text[file_size] = '\0';
-    buffer->length--;
 }
 
 // Print a chunk of text with special highlights and characters for
