@@ -5,44 +5,69 @@
 #include <stdbool.h>
 #include <ncurses.h>
 
-#define PAIR_NORMAL 0
-#define PAIR_SPECIAL 1
-#define PAIR_HIGHLIGHT 2
+/*
+ * Color pairs used in the typing application
+ */
+typedef enum {
+    COLOR_NORMAL,
+    COLOR_SPECIAL,
+    COLOR_HIGHLIGHT,
+} Color;
 
+/*
+ * Special characters used for legibility puposes
+ */
 #define NEWLINE "$\n"
 #define TABCHAR "----"
 
-#define COLOR_ON(pair) attron(COLOR_PAIR(pair))
-#define COLOR_OFF(pair) attroff(COLOR_PAIR(pair))
+/*
+ * Turn a special color on
+ */
+#define COLOR_ON(color) attron(COLOR_PAIR(color))
+
+/*
+ * Turn a special color off
+ */
+#define COLOR_OFF(color) attroff(COLOR_PAIR(color))
+
+/*
+ * Mask for comparing against CTRL-pressed characters
+ */
 #define CTRL(k) ((k) & 0x1f)
-#define MIN(a, b) ((a < b) ? a : b)
 
-#define SPECIAL_PRINTW(pair, ...)               \
-    do {                                        \
-        attron(COLOR_PAIR(PAIR_SPECIAL));       \
-        printw(__VA_ARGS__);                    \
-        attroff(COLOR_PAIR(PAIR_SPECIAL));      \
-        attron(COLOR_PAIR(pair));               \
-    } while (0)
-
+/*
+ * A growable character array for storing the contents of files to
+ * practise
+ */
 typedef struct {
     char *text;
     size_t capacity;
 } Buffer;
 
+/*
+ * The results of the typing practise
+ */
 typedef struct {
     size_t total;
     size_t wrong;
+    clock_t time;
 } Result;
 
-// Free the text in a buffer and reset it
+/*
+ * Free the text in a buffer and reset it
+ * @param buffer *Buffer The buffer to free
+ */
 void buffer_free(Buffer *buffer)
 {
     if (buffer->text) free(buffer->text);
     buffer->capacity = 0;
 }
 
-// Read a file into a buffer
+/*
+ * Read a file into a buffer
+ * @param buffer *Buffer The buffer to read the file into
+ * @param file_name *char The file to read into the buffer
+ */
 void buffer_read(Buffer *buffer, const char *file_name)
 {
     FILE *file = fopen(file_name, "r");
@@ -75,159 +100,156 @@ void buffer_read(Buffer *buffer, const char *file_name)
     buffer->text[file_size] = '\0';
 }
 
-// Print a chunk of text with special highlights and characters for
-// newlines and tabs
-size_t colored_print(const char *text, size_t limit)
+/*
+ * Print a string in the COLOR_SPECIAL color
+ * @param text *char The text to print in the special color
+ * @param color Color The color to switch to after the text
+ */
+void print_special(const char *text, Color color)
+{
+    COLOR_ON(COLOR_SPECIAL);
+    printw(text);
+    COLOR_OFF(COLOR_SPECIAL);
+    COLOR_ON(color);
+}
+
+/*
+ * Print a character with special characters and colors
+ * @param ch char The character to print
+ * @param index *size_t The index of the cursor
+ * @param color Color The color to use as the default
+ */
+void print_char(char ch, size_t *index, Color color)
+{
+    switch (ch) {
+    case '\n':
+        if (index) *index += 1 + COLS - *index % COLS;
+        print_special(NEWLINE, color);
+        return;
+    case '\t':
+        if (index) *index += strlen(TABCHAR);
+        print_special(TABCHAR, color);
+        return;
+    default:
+        if (index) *index += 1;
+        addch(ch);
+        return;
+    }
+}
+
+/*
+ * Print a buffer
+ * @param buffer *Buffer The buffer to print
+ * @param limit *size_t The ending index of the buffer in the screen
+ * @return size_t the starting index of the buffer in the screen
+ */
+size_t buffer_print(const Buffer *buffer, size_t *limit)
 {
     clear();
-    COLOR_OFF(PAIR_HIGHLIGHT);
+    COLOR_OFF(COLOR_HIGHLIGHT);
+    COLOR_ON(COLOR_NORMAL);
 
-    size_t count = 0;
-    size_t index = 0;
-    for ( ; count < limit; ++index) {
-        switch (text[index]) {
-        case '\n':
-            count += 1 + COLS - count % COLS;
-            SPECIAL_PRINTW(PAIR_NORMAL, NEWLINE);
-            break;
-        case '\t':
-            count += strlen(TABCHAR);
-            SPECIAL_PRINTW(PAIR_NORMAL, TABCHAR);
-            break;
-        case '\0':
-            count = limit;
-            break;
-        default:
-            count++;
-            addch(text[index]);
-        }
-    }
-    COLOR_ON(PAIR_HIGHLIGHT);
-    return index;
+    size_t start = *limit;
+    size_t grid_size = LINES * COLS;
+    size_t text_size = strlen(buffer->text);
+    for (size_t i = 0; i < grid_size && *limit < text_size; *limit += 1)
+        print_char(buffer->text[*limit], &i, COLOR_NORMAL);
+
+    COLOR_ON(COLOR_HIGHLIGHT);
+    move(0, 0);
+
+    return start;
 }
 
-// Train the user on a buffer
-bool buffer_train(const Buffer *buffer, Result *result)
+/*
+ * Practise on a buffer
+ * @param buffer *Buffer The buffer to practise on
+ * @param result *Result The result to update
+ * @return bool If the user pressed CTRL-q
+ */
+bool buffer_practise(const Buffer *buffer, Result *result)
 {
-    const char *page = buffer->text;
-    size_t page_size = 0;
-
-    size_t wrong = 0;
-    size_t total = 0;
-
     char input;
-    size_t index = 0;
-    size_t row = 0;
-    size_t col = 0;
+    size_t limit = 0;
 
-    bool running = true;
-    bool stopped = false;
-    while (running) {
-        // Display the current "page" of the buffer to be trained. A
-        // page is a portion of the buffer which can be displayed at a
-        // time because of terminal size limitations.
-        page_size = colored_print(page, LINES * COLS);
-
-        // Go to the origin of the terminal screen
-        row = 0;
-        col = 0;
-        move(row, col);
-
-        // Train the user on the current page
-        while (running) {
+    clock_t start = 0;
+    while (limit < strlen(buffer->text)) {
+        for (size_t i = buffer_print(buffer, &limit); i < limit; ) {
             input = getch();
+            if (i == 0) start = clock(); // Start the clock on first key press
 
-            // Basically keep count of the total and wrongly typed
-            // characters. Also keep highlighting the characters
-            // which have been typed for a better visual appeal.
-            if (input == page[index]) {
-                index++;
-                total++;
-
-                if (index >= page_size) {
-                    break;
-                } else if (page[index] == '\0') {
-                    running = false;
-                } else {
-                    // Move the cursor down one line if needed
-                    if (col + 1 == (size_t) COLS) {
-                        col = 0;
-                        row++;
-                    } else if (page[index - 1] == '\n') {
-                        col = 0;
-                        row++;
-                        SPECIAL_PRINTW(PAIR_HIGHLIGHT, NEWLINE);
-                    } else if (page[index - 1] == '\t') {
-                        SPECIAL_PRINTW(PAIR_HIGHLIGHT, TABCHAR);
-                        col += strlen(TABCHAR);
-                    } else {
-                        col++;
-                        addch(page[index - 1]);
-                    }
-
-                    move(row, col);
-                }
-            } else if (input == CTRL('q')) {
-                // CTRL-q stops the application
-                running = false;
-                stopped = true;
+            if (input == CTRL('q')) {
+                result->time += clock() - start;
+                return false;
+            } else if (input == buffer->text[i]) {
+                print_char(buffer->text[i++], NULL, COLOR_HIGHLIGHT);
+                result->total++;
             } else {
-                wrong++;
+                result->wrong++;
             }
         }
-
-        // Go to the next page of the buffer
-        page += page_size;
-        index = 0;
     }
 
-    if (result) {
-        result->total += total;
-        result->wrong += wrong;
-    }
-
-    return !stopped;
+    result->time += clock() - start;
+    return true;
 }
 
-// Words Per Minute.
-// The formula is (characters / 5) / minutes
-static inline float wpm(size_t chars, clock_t time)
+/*
+ * Words Per Minute calculation: (characters / 5) / minutes
+ * @param result Result The result of the typing practise
+ * @return float The words per minute of the user
+ */
+static inline float wpm(Result result)
 {
-    return (3.0 * CLOCKS_PER_SEC * chars) / (250.0 * time);
+    return (3.0 * CLOCKS_PER_SEC * result.total) / (250.0 * result.time);
 }
 
-// Accuracy percentage
+/*
+ * Accuracy percentage calculation: ((total - wrong) * 100) / total
+ * @param result Result The result of the typing practise
+ * @return float The accuracy percentage of the user
+ */
 static inline float accuracy(Result result)
 {
-    return (float) (result.total - result.wrong) / result.total * 100;
+    return (float) ((result.total - result.wrong) * 100.0) / result.total;
+}
+
+/*
+ * Initialize the ncurses window of the typing application
+ */
+static inline void ncurses_init(void)
+{
+    initscr();
+    raw();
+    noecho();
+    use_default_colors();
+    start_color();
+    init_pair(COLOR_NORMAL, COLOR_WHITE, COLOR_BLACK);
+    init_pair(COLOR_SPECIAL, COLOR_BLUE, COLOR_BLACK);
+    init_pair(COLOR_HIGHLIGHT, COLOR_YELLOW, COLOR_BLACK);
 }
 
 int main(int argc, char **argv)
 {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: asdf [FILE]\n");
+        return 1;
+    }
+
     Buffer buffer = {0};
     Result result = {0};
 
-    initscr();
-    raw();
-    cbreak();
-    noecho();
-    use_default_colors();
-    start_color();
-    init_pair(PAIR_NORMAL, COLOR_WHITE, COLOR_BLACK);
-    init_pair(PAIR_SPECIAL, COLOR_BLUE, COLOR_BLACK);
-    init_pair(PAIR_HIGHLIGHT, COLOR_YELLOW, COLOR_BLACK);
-
-    clock_t start = clock();
+    ncurses_init();
     for (int i = 1; i < argc; ++i) {
         buffer_read(&buffer, argv[i]);
-        if (!buffer_train(&buffer, &result))
-            break;
+        if (!buffer_practise(&buffer, &result)) break;
     }
-    clock_t time = clock() - start;
-
     endwin();
+
     buffer_free(&buffer);
-    printf("WPM: %.2f\n", wpm(result.total, time));
+
+    printf("WPM: %.2f\n", wpm(result));
     printf("Accuracy: %.2f\n", accuracy(result));
+
     return 0;
 }
