@@ -1,4 +1,6 @@
 * Typing Practise
+[[./demo.png]]
+
 A TUI typing practise application which can be run on arbitrary
 files. This is *NOT* a trainer.
 
