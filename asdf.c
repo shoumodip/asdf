@@ -50,7 +50,7 @@ typedef struct {
 typedef struct {
     size_t total;
     size_t wrong;
-    clock_t time;
+    time_t time;
 } Result;
 
 /*
@@ -172,14 +172,14 @@ bool buffer_practise(const Buffer *buffer, Result *result)
     char input;
     size_t limit = 0;
 
-    clock_t start = 0;
+    time_t start = 0;
     while (limit < strlen(buffer->text)) {
         for (size_t i = buffer_print(buffer, &limit); i < limit; ) {
             input = getch();
-            if (i == 0) start = clock(); // Start the clock on first key press
+            if (i == 0) start = time(NULL); // Start the clock on first key press
 
             if (input == CTRL('q')) {
-                result->time += clock() - start;
+                result->time += time(NULL) - start;
                 return false;
             } else if (input == buffer->text[i]) {
                 print_char(buffer->text[i++], NULL, COLOR_HIGHLIGHT);
@@ -190,7 +190,7 @@ bool buffer_practise(const Buffer *buffer, Result *result)
         }
     }
 
-    result->time += clock() - start;
+    result->time += time(NULL) - start;
     return true;
 }
 
@@ -201,7 +201,7 @@ bool buffer_practise(const Buffer *buffer, Result *result)
  */
 static inline float wpm(Result result)
 {
-    return (3.0 * CLOCKS_PER_SEC * result.total) / (250.0 * result.time);
+    return 12.0 * result.total / result.time;
 }
 
 /*

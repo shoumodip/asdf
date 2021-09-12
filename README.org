@@ -10,7 +10,7 @@ files. This is *NOT* a trainer.
 #+begin_src console
 $ git clone https://github.com/shoumodip/asdf
 $ cd asdf
-$ cc -o asdf asdf.c -lncurses
+$ make
 $ ./asdf lorem.txt
 #+end_src
 
