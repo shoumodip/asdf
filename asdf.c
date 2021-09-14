@@ -224,9 +224,9 @@ static inline void ncurses_init(void)
     noecho();
     use_default_colors();
     start_color();
-    init_pair(COLOR_NORMAL, COLOR_WHITE, COLOR_BLACK);
-    init_pair(COLOR_SPECIAL, COLOR_BLUE, COLOR_BLACK);
-    init_pair(COLOR_HIGHLIGHT, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(COLOR_NORMAL, -1, -1);
+    init_pair(COLOR_SPECIAL, COLOR_BLUE, -1);
+    init_pair(COLOR_HIGHLIGHT, COLOR_YELLOW, -1);
 }
 
 int main(int argc, char **argv)
