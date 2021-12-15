@@ -1,27 +1,26 @@
-* Typing Practise
-[[./demo.png]]
+# Typing Practise
+![Demo](./demo.png)
 
 A TUI typing practise application which can be run on arbitrary
-files. This is *NOT* a trainer.
+files. This is **NOT** a trainer.
 
-* Quick Start
-- Depends on [[https://invisible-island.net/ncurses/][Ncurses]]
+## Quick Start
+- Depends on [ncurses](https://invisible-island.net/ncurses/)
+- This project uses [make.h](https://github.com/shoumodip/make.h)
 
-#+begin_src console
-$ git clone https://github.com/shoumodip/asdf
-$ cd asdf
-$ make
-$ ./asdf lorem.txt
-#+end_src
+```console
+$ cc -o make make.c
+$ ./make run
+```
 
-* Usage
+## Usage
 This application goes through the files in the command line arguments
 one by one and makes the user practise on them.
 
-#+begin_src console
+```console
 $ asdf [FILES]
 $ asdf lorem.txt asdf.c
-#+end_src
+```
 
 There is no timer, no whiz-bang sound effects, no timers or
 real-time WPM displayers, etc. The interface consists of just the text
@@ -31,8 +30,8 @@ typing environment.
 On exiting the application or when the text it has been running on has
 ended, your WPM and accuracy percentage is informed to you.
 
-#+begin_src console
+```console
 $ asdf lorem.txt
 WPM: 149.94
 Accuracy: 97.34
-#+end_src
+```
