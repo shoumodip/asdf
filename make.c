@@ -12,8 +12,9 @@ int main(int argc, char **argv)
     if (strcmp(argv[1], "build") == 0) {
         make_cc("asdf", "asdf.c", CFLAGS, LIBS);
     } else if (strcmp(argv[1], "run") == 0) {
+        make_assert(argc > 2, "no input file path provided");
         make_cc("asdf", "asdf.c", CFLAGS, LIBS);
-        make_cmd("./asdf");
+        make_cmd("./asdf", argv[2]);
     } else {
         make_error("unknown subcommand `%s`", argv[1]);
     }
