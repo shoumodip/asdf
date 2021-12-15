@@ -10,7 +10,7 @@ files. This is **NOT** a trainer.
 
 ```console
 $ cc -o make make.c
-$ ./make run
+$ ./make run lorem.txt
 ```
 
 ## Usage
