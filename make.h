@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <unistd.h>
 
 #include <errno.h>
@@ -59,7 +60,7 @@ long make_modified(const char *file_path)
 
 #define make_assert(condition, ...) if (!(condition)) make_error(__VA_ARGS__)
 
-void make_vcmd(char **args)
+void make_vcmd(bool exitp, char **args)
 {
     printf("[cmd] ");
     for (size_t i = 0; args[i]; ++i) printf("%s ", args[i]);
@@ -73,14 +74,16 @@ void make_vcmd(char **args)
         int status;
         wait(&status);
 
-        int code = WEXITSTATUS(status);
-        make_assert(code == 0, "process exited abormally with code %d", code);
+        if (exitp) {
+            int code = WEXITSTATUS(status);
+            make_assert(code == 0, "process exited abnormally with code %d", code);
+        }
     } else {
         make_error("could not execute process: %s\n", strerror(errno));
     }
 }
 
-#define make_cmd(...) make_vcmd((char *[]) {__VA_ARGS__, NULL})
+#define make_cmd(...) make_vcmd(1, (char *[]) {__VA_ARGS__, NULL})
 
 #define make_cc(binary, source, ...) \
     if (make_modified(source) > make_modified(binary)) { \
@@ -90,7 +93,7 @@ void make_vcmd(char **args)
 #define make_rebuild(argc, argv) \
     if (argc && make_modified(__FILE__) > make_modified(*argv)) { \
         make_cmd("cc", "-o", *argv, __FILE__); \
-        make_vcmd(argv); \
+        make_vcmd(false, argv); \
         exit(0); \
     }
 
